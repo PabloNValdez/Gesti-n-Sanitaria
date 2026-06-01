@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Control de Expedientes</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS (XLSX) CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- jsPDF CDN para Exportar a PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans antialiased min-h-screen">
+
+    <!-- TOP BAR / HEADER -->
+    <header class="bg-slate-800 border-b border-slate-700 shadow-md sticky top-0 z-50 transition-all">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight bg-gradient-to-r from-teal-400 to-emerald-400 bg-clip-text text-transparent">
+                    Control de Expedientes
+                </h1>
+                <p class="text-xs text-slate-400 mt-1">Subsecretaría de Gestión Sanitaria</p>
+            </div>
+            
+            <!-- Cargador permanente e instantáneo de Excel -->
+            <div class="flex items-center gap-3 bg-slate-800/80 p-2 rounded-xl border border-slate-600 shadow-inner">
+                <label for="excelFile" class="text-xs font-semibold text-teal-400 cursor-pointer hover:text-teal-300 transition-colors px-2 py-1 bg-slate-700/50 rounded border border-slate-600">
+                    📂 Cargar / Actualizar Archivo
+                </label>
+                <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" class="hidden" />
+                <span id="fileNameLabel" class="text-xs text-slate-400 italic max-w-[180px] truncate">Ningún archivo cargado</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        
+        <!-- SECCIÓN DE FILTROS DINÁMICOS -->
+        <section class="bg-slate-800 border border-slate-700/80 rounded-2xl p-4 shadow-xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+            <div>
+                <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Año (Hojas)</label>
+                <select id="filterYear" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-teal-400 cursor-pointer">
+                    <option value="ALL">Todos los Años</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Estado Expediente</label>
+                <select id="filterEstado" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-teal-400 cursor-pointer"></select>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Operador / Gestión</label>
+                <select id="filterGestion" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-teal-400 cursor-pointer"></select>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Buscador General</label>
+                <input type="text" id="searchGlobal" placeholder="Paciente, Extracto, Expte..." class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-teal-400">
+            </div>
+            <div class="flex gap-2">
+                <button id="btnResetFilters" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold text-sm py-2 px-3 rounded-lg transition-all border border-slate-600 flex items-center justify-center gap-1">
+                    🧹 Limpiar
+                </button>
+            </div>
+        </section>
+
+        <!-- TARJETAS DE INDICADORES PRINCIPALES (KPIs) -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- TOTAL EXPEDIENTES -->
+            <div class="bg-gradient-to-br from-slate-800 to-slate-800/60 border border-slate-700 rounded-2xl p-5 shadow-lg relative overflow-hidden group">
+                <div class="absolute -right-4 -bottom-4 text-teal-500/10 text-7xl font-bold group-hover:scale-110 transition-transform duration-300 select-none">📊</div>
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Expedientes Totales</h3>
+                <p id="kpiTotal" class="text-3xl font-extrabold mt-2 text-teal-400 tracking-tight">0</p>
+                <div class="w-full bg-slate-700 h-1 rounded-full mt-3 overflow-hidden">
+                    <div class="bg-teal-400 h-full w-full"></div>
+                </div>
+            </div>
+            <!-- OPERADORES ACTIVOS -->
+            <div class="bg-gradient-to-br from-slate-800 to-slate-800/60 border border-slate-700 rounded-2xl p-5 shadow-lg relative overflow-hidden group">
+                <div class="absolute -right-4 -bottom-4 text-emerald-500/10 text-7xl font-bold group-hover:scale-110 transition-transform duration-300 select-none">👤</div>
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Operadores</h3>
+                <p id="kpiOperadores" class="text-3xl font-extrabold mt-2 text-emerald-400 tracking-tight">0</p>
+                <div class="w-full bg-slate-700 h-1 rounded-full mt-3 overflow-hidden">
+                    <div class="bg-emerald-400 h-full w-full"></div>
+                </div>
+            </div>
+            <!-- EFICIENCIA DE RESOLUCIÓN -->
+            <div class="bg-gradient-to-br from-slate-800 to-slate-800/60 border border-slate-700 rounded-2xl p-5 shadow-lg relative overflow-hidden group">
+                <div class="absolute -right-4 -bottom-4 text-purple-500/10 text-7xl font-bold group-hover:scale-110 transition-transform duration-300 select-none">⚡</div>
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Eficiencia (% Finalizados)</h3>
+                <p id="kpiEficiencia" class="text-3xl font-extrabold mt-2 text-purple-400 tracking-tight">0%</p>
+                <div class="w-full bg-slate-700 h-1 rounded-full mt-3 overflow-hidden">
+                    <div id="barEficiencia" class="bg-purple-400 h-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
+            <!-- MOVIMIENTOS ACTIVOS -->
+            <div class="bg-gradient-to-br from-slate-800 to-slate-800/60 border border-slate-700 rounded-2xl p-5 shadow-lg relative overflow-hidden group">
+                <div class="absolute -right-4 -bottom-4 text-amber-500/10 text-7xl font-bold group-hover:scale-110 transition-transform duration-300 select-none">🔄</div>
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">En Trámite (Activos)</h3>
+                <p id="kpiActivos" class="text-3xl font-extrabold mt-2 text-amber-400 tracking-tight">0</p>
+                <div class="w-full bg-slate-700 h-1 rounded-full mt-3 overflow-hidden">
+                    <div id="barActivos" class="bg-amber-400 h-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- GRÁFICOS INTERACTIVOS -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Gráfico Barras: Estados -->
+            <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl lg:col-span-1 flex flex-col justify-between">
+                <div>
+                    <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4 border-b border-slate-700 pb-2">
+                        Gestión: FINALIZADO vs EN TRAMITE
+                    </h3>
+                    <div class="relative max-h-[260px] flex justify-center items-center">
+                        <canvas id="chartEstados"></canvas>
+                    </div>
+                </div>
+            </div>
+            <!-- Gráfico Dona: Expedientes por Operador -->
+            <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl lg:col-span-1 flex flex-col justify-between">
+                <div>
+                    <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4 border-b border-slate-700 pb-2">
+                        Volumen por Operador (Gestión)
+                    </h3>
+                    <div class="relative max-h-[260px] flex justify-center items-center">
+                        <canvas id="chartDonaOperadores"></canvas>
+                    </div>
+                </div>
+            </div>
+            <!-- Gráfico de Líneas Adicional pertinente: Histórico / Tendencia -->
+            <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl lg:col-span-1 flex flex-col justify-between">
+                <div>
+                    <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4 border-b border-slate-700 pb-2">
+                        Evolución Temporal de Altas
+                    </h3>
+                    <div class="relative max-h-[260px] flex justify-center items-center">
+                        <canvas id="chartEvolucion"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TABLA DE DATOS PRINCIPALES CON EXPORTACIONES -->
+        <section class="bg-slate-800 border border-slate-700 rounded-2xl shadow-xl overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-700 bg-slate-800/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h3 class="text-base font-bold text-slate-200">Detalle de Registros Filtrados</h3>
+                    <p class="text-xs text-slate-400 mt-0.5">Mostrando registros según criterios seleccionados</p>
+                </div>
+                <div class="flex gap-2 w-full sm:w-auto">
+                    <button id="btnExportExcel" class="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2 rounded-lg transition-colors border border-emerald-700 shadow flex items-center justify-center gap-1">
+                        📊 Exportar Excel
+                    </button>
+                    <button id="btnExportPDF" class="flex-1 sm:flex-initial bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-4 py-2 rounded-lg transition-colors border border-rose-700 shadow flex items-center justify-center gap-1">
+                        📄 Exportar PDF
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabla responsiva -->
+            <div class="overflow-x-auto max-h-[450px] overflow-y-auto">
+                <table class="w-full text-left border-collapse" id="mainDataTable">
+                    <thead class="bg-slate-900 sticky top-0 text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-700 z-10">
+                        <tr>
+                            <th class="px-4 py-3">EXPEDIENTE N°</th>
+                            <th class="px-4 py-3">FECHA INICIO</th>
+                            <th class="px-4 py-3">EXTRACTO EXPTE</th>
+                            <th class="px-4 py-3">NOMBRE DEL PACIENTE</th>
+                            <th class="px-4 py-3">MOVIMIENTOS DEL EXPEDIENTE</th>
+                            <th class="px-4 py-3">GESTION</th>
+                            <th class="px-4 py-3">ESTADO EXPEDIENTE</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-700/60 text-xs text-slate-300" id="tableBody">
+                        <tr>
+                            <td colspan="7" class="px-6 py-10 text-center text-slate-400 italic">
+                                Cargue un archivo Excel válido para visualizar los datos.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="px-4 py-2 bg-slate-900 border-t border-slate-700 text-right text-xs text-slate-400">
+                Registros visualizados: <span id="lblRowCount" class="font-bold text-teal-400">0</span>
+            </div>
+        </section>
+    </main>
+
+    <!-- PROCESAMIENTO JAVASCRIPT LOGIC -->
+    <script>
+        // Memoria interna de la aplicación (Estructuras de Datos globales)
+        let GLOBAL_DATA = []; 
+        let AVAILABLE_YEARS = [];
+        
+        // Instancias globales para reiniciar los gráficos de Chart.js de forma dinámica
+        let chartInstEstados = null;
+        let chartInstDona = null;
+        let chartInstEvolucion = null;
+
+        // Mapeo estructurado de elementos del DOM
+        const dom = {
+            fileInput: document.getElementById('excelFile'),
+            fileNameLabel: document.getElementById('fileNameLabel'),
+            filterYear: document.getElementById('filterYear'),
+            filterEstado: document.getElementById('filterEstado'),
+            filterGestion: document.getElementById('filterGestion'),
+            searchGlobal: document.getElementById('searchGlobal'),
+            btnReset: document.getElementById('btnResetFilters'),
+            btnExcel: document.getElementById('btnExportExcel'),
+            btnPDF: document.getElementById('btnExportPDF'),
+            tableBody: document.getElementById('tableBody'),
+            lblRowCount: document.getElementById('lblRowCount'),
+            kpiTotal: document.getElementById('kpiTotal'),
+            kpiOperadores: document.getElementById('kpiOperadores'),
+            kpiEficiencia: document.getElementById('kpiEficiencia'),
+            kpiActivos: document.getElementById('kpiActivos'),
+            barEficiencia: document.getElementById('barEficiencia'),
+            barActivos: document.getElementById('barActivos')
+        };
+
+        // Inicializador de Eventos de Interfaz
+        document.addEventListener('DOMContentLoaded', () => {
+            dom.fileInput.addEventListener('change', handleFileSelection, false);
+            dom.filterYear.addEventListener('change', applyFiltersAndRender);
+            dom.filterEstado.addEventListener('change', applyFiltersAndRender);
+            dom.filterGestion.addEventListener('change', applyFiltersAndRender);
+            dom.searchGlobal.addEventListener('input', applyFiltersAndRender);
+            dom.btnReset.addEventListener('click', resetFilters);
+            dom.btnExcel.addEventListener('click', exportToExcel);
+            dom.btnPDF.addEventListener('click', exportToPDF);
+        });
+
+        // Lógica de Lectura del archivo cargado (Soporta infinitas recargas offline)
+        function handleFileSelection(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            dom.fileNameLabel.textContent = file.name;
+            const reader = new FileReader();
+            
+            reader.onload = function(evt) {
+                try {
+                    const data = new Uint8Array(evt.target.result);
+                    const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                    
+                    processWorkbook(workbook);
+                } catch (error) {
+                    console.error(error);
+                    alert('Error crítico al procesar el archivo. Verifique la estructura del Excel.');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Estructuración y limpieza minuciosa de datos crudos del Excel
+        function processWorkbook(wb) {
+            GLOBAL_DATA = [];
+            AVAILABLE_YEARS = [...wb.SheetNames];
+
+            AVAILABLE_YEARS.forEach(sheetName => {
+                const worksheet = wb.Sheets[sheetName];
+                // Convertimos la hoja a JSON estructurado en arreglos crudos
+                const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+                
+                // Buscamos dinámicamente la fila de cabeceras legítima ignorando el ruido superior
+                let headerIndex = -1;
+                for (let i = 0; i < rawRows.length; i++) {
+                    if (rawRows[i].includes("EXPEDIENTE N°") || rawRows[i].includes("ESTADO EXPEDIENTE")) {
+                        headerIndex = i;
+                        break;
+                    }
+                }
+
+                if (headerIndex === -1) return; // Si la estructura no coincide, saltamos la hoja
+
+                const headers = rawRows[headerIndex].map(h => String(h).trim().toUpperCase());
+                
+                // Mapeo dinámico de índices posicionales
+                const idxExpte = headers.indexOf("EXPEDIENTE N°");
+                const idxFecha = headers.indexOf("FECHA INICIO");
+                const idxExtracto = headers.indexOf("EXTRACTO EXPTE");
+                const idxPaciente = headers.indexOf("NOMBRE DEL PACIENTE");
+                const idxMovs = headers.indexOf("MOVIMIENTOS DEL EXPEDIENTE");
+                const idxGestion = headers.indexOf("GESTION");
+                const idxEstado = headers.indexOf("ESTADO EXPEDIENTE");
+
+                // Extracción de filas válidas posteriores al header encontrado
+                for (let j = headerIndex + 1; j < rawRows.length; j++) {
+                    const row = rawRows[j];
+                    if (!row || row.length === 0) continue;
+
+                    const valExpte = row[idxExpte] ? String(row[idxExpte]).trim() : "";
+                    const valPaciente = row[idxPaciente] ? String(row[idxPaciente]).trim() : "";
+                    const valExtracto = row[idxExtracto] ? String(row[idxExtracto]).trim() : "";
+                    const valEstado = row[idxEstado] ? String(row[idxEstado]).trim() : "";
+
+                    // Descartar filas vacías o de relleno
+                    if (!valExpte && !valPaciente && !valExtracto && !valEstado) continue;
+
+                    // Formateo de fechas consistente
+                    let fechaFormateada = "";
+                    if (row[idxFecha]) {
+                        const cellRaw = row[idxFecha];
+                        if (cellRaw instanceof Date && !isNaN(cellRaw)) {
+                            fechaFormateada = cellRaw.toISOString().split('T')[0];
+                        } else {
+                            fechaFormateada = String(cellRaw).trim().split(" ")[0];
+                        }
+                    }
+
+                    GLOBAL_DATA.push({
+                        yearSource: sheetName,
+                        expediente: valExpte,
+                        fecha: fechaFormateada,
+                        extracto: valExtracto,
+                        paciente: valPaciente,
+                        movimientos: row[idxMovs] ? String(row[idxMovs]).trim() : "",
+                        gestion: row[idxGestion] ? String(row[idxGestion]).trim() : "SIN ASIGNAR",
+                        estado: valEstado ? valEstado.toUpperCase() : "SIN ESPECIFICAR"
+                    });
+                }
+            });
+
+            populateFilterSelectors();
+            applyFiltersAndRender();
+        }
+
+        // Llenado dinámico de selects con base en los datos cargados en tiempo real
+        function populateFilterSelectors() {
+            // Selectores de año basados en hojas encontradas
+            dom.filterYear.innerHTML = '<option value="ALL">Todos los Años</option>';
+            AVAILABLE_YEARS.forEach(y => {
+                dom.filterYear.innerHTML += `<option value="${y}">${y}</option>`;
+            });
+
+            // Selectores de Estados únicos
+            const estadosUnicos = [...new Set(GLOBAL_DATA.map(d => d.estado))].filter(Boolean).sort();
+            dom.filterEstado.innerHTML = '<option value="ALL">Todos los Estados</option>';
+            estadosUnicos.forEach(e => {
+                dom.filterEstado.innerHTML += `<option value="${e}">${e}</option>`;
+            });
+
+            // Selectores de Operadores únicos
+            const gestionesUnicas = [...new Set(GLOBAL_DATA.map(d => d.gestion))].filter(Boolean).sort();
+            dom.filterGestion.innerHTML = '<option value="ALL">Todos los Operadores</option>';
+            gestionesUnicas.forEach(g => {
+                dom.filterGestion.innerHTML += `<option value="${g}">${g}</option>`;
+            });
+        }
+
+        // Limpieza rápida de los filtros de la interfaz
+        function resetFilters() {
+            dom.filterYear.value = "ALL";
+            dom.filterEstado.value = "ALL";
+            dom.filterGestion.value = "ALL";
+            dom.searchGlobal.value = "";
+            applyFiltersAndRender();
+        }
+
+        // Motor central de Filtrado, Renderizado de Tablas e Indicadores Matemáticos
+        function applyFiltersAndRender() {
+            const yr = dom.filterYear.value;
+            const est = dom.filterEstado.value;
+            const gst = dom.filterGestion.value;
+            const search = dom.searchGlobal.value.toLowerCase().trim();
+
+            // Filtrado del set de datos global
+            const filtered = GLOBAL_DATA.filter(item => {
+                if (yr !== "ALL" && item.yearSource !== yr) return false;
+                if (est !== "ALL" && item.estado !== est) return false;
+                if (gst !== "ALL" && item.gestion !== gst) return false;
+                
+                if (search) {
+                    const matchText = `${item.expediente} ${item.paciente} ${item.extracto} ${item.movimientos} ${item.gestion}`.toLowerCase();
+                    if (!matchText.includes(search)) return false;
+                }
+                return true;
+            });
+
+            renderKPIs(filtered);
+            renderTable(filtered);
+            renderCharts(filtered);
+        }
+
+        // Cálculos matemáticos y porcentajes de las tarjetas de KPIs
+        function renderKPIs(data) {
+            const total = data.length;
+            const uniqueOperadores = [...new Set(data.map(d => d.gestion).filter(g => g && g !== "SIN ASIGNAR"))].length;
+            const finalizados = data.filter(d => d.estado === "FINALIZADO").length;
+            const activos = data.filter(d => d.estado === "EN TRAMITE" || d.estado === "EN TRÁMITE").length;
+
+            const eficiencia = total > 0 ? Math.round((finalizados / total) * 100) : 0;
+            const porcActivos = total > 0 ? Math.round((activos / total) * 100) : 0;
+
+            dom.kpiTotal.textContent = total.toLocaleString();
+            dom.kpiOperadores.textContent = uniqueOperadores;
+            dom.kpiEficiencia.textContent = `${eficiencia}%`;
+            dom.kpiActivos.textContent = activos.toLocaleString();
+
+            dom.barEficiencia.style.width = `${eficiencia}%`;
+            dom.barActivos.style.width = `${porcActivos}%`;
+        }
+
+        // Inyección interactiva de registros en la tabla DOM
+        function renderTable(data) {
+            dom.lblRowCount.textContent = data.length;
+            if (data.length === 0) {
+                dom.tableBody.innerHTML = `<tr><td colspan="7" class="px-6 py-10 text-center text-slate-400 italic">No se encontraron registros coincidentes.</td></tr>`;
+                return;
+            }
+
+            dom.tableBody.innerHTML = data.map(item => {
+                let badgeClass = "bg-slate-700 text-slate-300";
+                if (item.estado === "FINALIZADO") badgeClass = "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+                if (item.estado === "EN TRAMITE" || item.estado === "EN TRÁMITE") badgeClass = "bg-amber-500/20 text-amber-400 border border-amber-500/30";
+
+                return `
+                    <tr class="hover:bg-slate-700/40 transition-colors">
+                        <td class="px-4 py-3 font-mono font-bold text-teal-400 whitespace-nowrap">${item.expediente || '-'}</td>
+                        <td class="px-4 py-3 whitespace-nowrap">${item.fecha || '-'}</td>
+                        <td class="px-4 py-3 max-w-xs truncate" title="${item.extracto}">${item.extracto || '-'}</td>
+                        <td class="px-4 py-3 font-semibold text-slate-200">${item.paciente || '-'}</td>
+                        <td class="px-4 py-3 max-w-xs truncate" title="${item.movimientos}">${item.movimientos || '-'}</td>
+                        <td class="px-4 py-3 whitespace-nowrap"><span class="text-slate-400">👤</span> ${item.gestion || '-'}</td>
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            <span class="px-2 py-0.5 rounded text-[11px] font-bold tracking-wide uppercase ${badgeClass}">
+                                ${item.estado}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Destrucción y recreación controlada de gráficos dinámicos con Tooltips interactivos
+        function renderCharts(data) {
+            // --- GRÁFICO 1: BARRAS - ESTADOS ---
+            const countFinalizado = data.filter(d => d.estado === "FINALIZADO").length;
+            const countTramite = data.filter(d => d.estado === "EN TRAMITE" || d.estado === "EN TRÁMITE").length;
+            const countOtros = data.length - (countFinalizado + countTramite);
+
+            if (chartInstEstados) chartInstEstados.destroy();
+            const ctx1 = document.getElementById('chartEstados').getContext('2d');
+            chartInstEstados = new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: ['FINALIZADO', 'EN TRAMITE', 'OTROS'],
+                    datasets: [{
+                        label: 'Cantidad',
+                        data: [countFinalizado, countTramite, countOtros],
+                        backgroundColor: ['#34d399', '#fbbf24', '#94a3b8'],
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: { backgroundColor: '#1e293b', titleColor: '#34d399', bodyColor: '#f8fafc' }
+                    },
+                    scales: {
+                        y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
+                        x: { ticks: { color: '#94a3b8' } }
+                    }
+                }
+            });
+
+            // --- GRÁFICO 2: DONA - VOLUMEN POR OPERADOR ---
+            const opCounts = {};
+            data.forEach(d => { if (d.gestion) opCounts[d.gestion] = (opCounts[d.gestion] || 0) + 1; });
+            const opLabels = Object.keys(opCounts);
+            const opValues = Object.values(opCounts);
+
+            if (chartInstDona) chartInstDona.destroy();
+            const ctx2 = document.getElementById('chartDonaOperadores').getContext('2d');
+            chartInstDona = new Chart(ctx2, {
+                type: 'doughnut',
+                data: {
+                    labels: opLabels,
+                    datasets: [{
+                        data: opValues,
+                        backgroundColor: ['#2dd4bf', '#3b82f6', '#a855f7', '#ec4899', '#f97316', '#64748b', '#e2e8f0']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right', labels: { color: '#94a3b8', boxWidth: 12, font: { size: 10 } } },
+                        tooltip: { backgroundColor: '#1e293b', bodyColor: '#f8fafc' }
+                    }
+                }
+            });
+
+            // --- GRÁFICO 3: LÍNEAS (PERTINENTE) - TENDENCIA MENSUAL DE ALTAS ---
+            const temporalCounts = {};
+            data.forEach(d => {
+                if (d.fecha && d.fecha.length >= 7) {
+                    const mesAnio = d.fecha.substring(0, 7); // Extrae 'YYYY-MM'
+                    temporalCounts[mesAnio] = (temporalCounts[mesAnio] || 0) + 1;
+                }
+            });
+            const sortedMonths = Object.keys(temporalCounts).sort();
+            const timelineValues = sortedMonths.map(m => temporalCounts[m]);
+
+            if (chartInstEvolucion) chartInstEvolucion.destroy();
+            const ctx3 = document.getElementById('chartEvolucion').getContext('2d');
+            chartInstEvolucion = new Chart(ctx3, {
+                type: 'line',
+                data: {
+                    labels: sortedMonths,
+                    datasets: [{
+                        label: 'Expedientes Registrados',
+                        data: timelineValues,
+                        borderColor: '#a855f7',
+                        backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { backgroundColor: '#1e293b', titleColor: '#a855f7', bodyColor: '#f8fafc' }
+                    },
+                    scales: {
+                        y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8', precision: 0 } },
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 9 } } }
+                    }
+                }
+            });
+        }
+
+        // LÓGICA DE EXPORTACIÓN CONTEXTUAL A EXCEL (Solo lo filtrado en pantalla)
+        function exportToExcel() {
+            // Obtenemos los datos visibles actuales recalculando filtros
+            const yr = dom.filterYear.value;
+            const est = dom.filterEstado.value;
+            const gst = dom.filterGestion.value;
+            const search = dom.searchGlobal.value.toLowerCase().trim();
+
+            const filtered = GLOBAL_DATA.filter(item => {
+                if (yr !== "ALL" && item.yearSource !== yr) return false;
+                if (est !== "ALL" && item.estado !== est) return false;
+                if (gst !== "ALL" && item.gestion !== gst) return false;
+                if (search) {
+                    const matchText = `${item.expediente} ${item.paciente} ${item.extracto} ${item.movimientos} ${item.gestion}`.toLowerCase();
+                    if (!matchText.includes(search)) return false;
+                }
+                return true;
+            });
+
+            if(filtered.length === 0) {
+                alert("No hay datos filtrados para exportar.");
+                return;
+            }
+
+            // Estructuramos columnas limpias para el archivo de salida
+            const outputRows = filtered.map(item => ({
+                "EXPEDIENTE N°": item.expediente,
+                "FECHA INICIO": item.fecha,
+                "EXTRACTO EXPTE": item.extracto,
+                "NOMBRE DEL PACIENTE": item.paciente,
+                "MOVIMIENTOS DEL EXPEDIENTE": item.movimientos,
+                "GESTION / OPERADOR": item.gestion,
+                "ESTADO EXPEDIENTE": item.estado
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(outputRows);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Resultado_Filtrado");
+            
+            // Descarga automática local del libro excel construido
+            XLSX.writeFile(workbook, `Reporte_Expedientes_Filtrados.xlsx`);
+        }
+
+        // LÓGICA DE EXPORTACIÓN CONTEXTUAL A PDF AUTOCONTENIDO (Layout Horizontal)
+        function exportToPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('l', 'pt', 'a4'); // Formato apaisado para albergar todas las columnas requeridas
+
+            doc.setFillColor(30, 41, 59);
+            doc.rect(0, 0, 842, 60, 'F');
+            
+            doc.setTextColor(45, 212, 191);
+            doc.setFontSize(16);
+            doc.setFont("helvetica", "bold");
+            doc.text("SUBSECRETARÍA DE GESTIÓN SANITARIA", 40, 36);
+
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "normal");
+            doc.text(`Reporte de Expedientes Filtrados - Emitido el: ${new Date().toLocaleDateString()}`, 550, 35);
+
+            // Generar tabla PDF usando el plugin autoTable mapeando la tabla DOM real filtrada
+            doc.autoTable({
+                html: '#mainDataTable',
+                startY: 80,
+                theme: 'grid',
+                headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontSize: 8 },
+                bodyStyles: { fontSize: 8, textColor: [51, 65, 85] },
+                alternateRowStyles: { fillColor: [248, 250, 252] },
+                columnStyles: {
+                    0: { fontStyle: 'bold' },
+                    2: { cellWidth: 140 },
+                    4: { cellWidth: 140 }
+                }
+            });
+
+            doc.save('Reporte_Expedientes_Filtrados.pdf');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Gestión Sanitaria (v2)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans min-h-screen">
+
+    <div class="container mx-auto p-4 md:p-6 lg:p-8 max-w-7xl">
+        
+        <div class="bg-white rounded-xl shadow-sm p-6 mb-6 flex flex-col md:flex-row justify-between items-center gap-4 border border-gray-200">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">Dashboard Expedientes</h1>
+                <p class="text-sm text-gray-500">Subsecretaría de Gestión Sanitaria</p>
+            </div>
+            
+            <div class="flex items-center gap-4 w-full md:w-auto">
+                <div class="relative w-full md:w-auto">
+                    <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" 
+                        class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-4 mb-6 grid grid-cols-1 md:grid-cols-3 gap-4 border border-gray-200">
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Filtrar por Gestión (Responsable)</label>
+                <select id="filterGestion" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5">
+                    <option value="ALL">Todos</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Filtrar por Estado</label>
+                <select id="filterEstado" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5">
+                    <option value="ALL">Todos</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Año (Origen de hoja)</label>
+                <select id="filterYear" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5">
+                    <option value="ALL">Todos los años</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            
+            <div class="flex flex-col gap-6 lg:col-span-1">
+                <div class="bg-blue-600 text-white rounded-xl shadow-sm p-6 flex flex-col justify-center border border-blue-700">
+                    <h3 class="text-sm font-medium uppercase tracking-wider opacity-80">Total Expedientes</h3>
+                    <p class="text-5xl font-bold mt-2" id="kpiTotal">0</p>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200 flex justify-between items-center">
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-500 uppercase">Finalizados</h3>
+                        <p class="text-3xl font-bold text-green-600" id="kpiFinalizados">0</p>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-500 uppercase text-right">En Trámite</h3>
+                        <p class="text-3xl font-bold text-amber-500 text-right" id="kpiTramite">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200 lg:col-span-2">
+                <h3 class="text-sm font-semibold text-gray-500 uppercase mb-4 border-b pb-2">Búsqueda / Detalle de Expediente</h3>
+                
+                <div class="mb-4">
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Seleccionar Expediente N°</label>
+                    <select id="selectorExpediente" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg p-2.5">
+                        <option value="">Seleccione un expediente para ver sus detalles...</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-100">
+                    <div>
+                        <p class="text-xs text-gray-500 uppercase">Paciente</p>
+                        <p class="text-sm font-semibold text-gray-900 truncate" id="detPaciente">-</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500 uppercase">Gestión</p>
+                        <p class="text-sm font-semibold text-gray-900 truncate" id="detGestion">-</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500 uppercase">Fecha Inicio</p>
+                        <p class="text-sm font-semibold text-gray-900" id="detFecha">-</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500 uppercase">Extracto</p>
+                        <p class="text-sm font-semibold text-gray-900 truncate" id="detExtracto">-</p>
+                    </div>
+                    <div class="md:col-span-2">
+                        <p class="text-xs text-gray-500 uppercase">Movimientos</p>
+                        <p class="text-sm font-semibold text-gray-900" id="detMovimientos">-</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-200">
+                <h3 class="text-sm font-semibold text-gray-600 text-center mb-6">Estado: Finalizados vs En Trámite</h3>
+                <div class="relative h-64">
+                    <canvas id="chartEstado"></canvas>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-200">
+                <h3 class="text-sm font-semibold text-gray-600 text-center mb-6">Distribución por Expediente N°</h3>
+                <div class="relative h-64">
+                    <canvas id="chartExpedientes"></canvas>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-200">
+                <h3 class="text-sm font-semibold text-gray-600 text-center mb-6">Carga por Responsable (Gestión)</h3>
+                <div class="relative h-64">
+                    <canvas id="chartGestion"></canvas>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-200">
+                <h3 class="text-sm font-semibold text-gray-600 text-center mb-6">Top 10 Extractos (Temáticas)</h3>
+                <div class="relative h-64">
+                    <canvas id="chartExtractos"></canvas>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Variables Globales (Sin cambios)
+        let masterData = [];
+        let filteredData = [];
+        
+        let chartEstadoInstance = null;
+        let chartExpedientesInstance = null;
+        let chartGestionInstance = null;
+        let chartExtractosInstance = null;
+
+        const inputExcel = document.getElementById('excelFile');
+        const fGestion = document.getElementById('filterGestion');
+        const fEstado = document.getElementById('filterEstado');
+        const fYear = document.getElementById('filterYear');
+        const selExpediente = document.getElementById('selectorExpediente');
+
+        inputExcel.addEventListener('change', handleFileUpload);
+        fGestion.addEventListener('change', applyFilters);
+        fEstado.addEventListener('change', applyFilters);
+        fYear.addEventListener('change', applyFilters);
+        selExpediente.addEventListener('change', showExpedienteDetail);
+
+        // --- LÓGICA DE PROCESAMIENTO DEL EXCEL (Sin cambios) ---
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const data = new Uint8Array(event.target.result);
+                
+                // 1. Agregamos cellDates: true para que SheetJS extraiga el objeto Date nativo
+                const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                
+                masterData = []; // Reset
+                
+                workbook.SheetNames.forEach(sheetName => {
+                    const worksheet = workbook.Sheets[sheetName];
+                    const rawJson = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    
+                    let headerIndex = -1;
+                    for (let i = 0; i < Math.min(10, rawJson.length); i++) {
+                        if (rawJson[i].some(cell => typeof cell === 'string' && cell.includes('EXPEDIENTE N°'))) {
+                            headerIndex = i;
+                            break;
+                        }
+                    }
+
+                    if (headerIndex !== -1) {
+                        const headers = rawJson[headerIndex];
+                        const rows = rawJson.slice(headerIndex + 1);
+                        
+                        rows.forEach(row => {
+                            let obj = { _OrigenAÑO: sheetName.trim() };
+                            let hasData = false;
+                            
+                            headers.forEach((header, index) => {
+                                if (header) {
+                                    let val = row[index];
+                                    
+                                    // 2. Interceptamos el valor si es fecha y lo formateamos a DD/MM/AAAA
+                                    if (val instanceof Date && !isNaN(val)) {
+                                        val = val.toLocaleDateString('es-AR', {
+                                            day: '2-digit',
+                                            month: '2-digit',
+                                            year: 'numeric'
+                                        });
+                                    }
+                                    
+                                    obj[header.trim()] = val;
+                                    if(header.trim() === 'EXPEDIENTE N°' && val) hasData = true;
+                                }
+                            });
+                            
+                            if (hasData) {
+                                masterData.push(obj);
+                            }
+                        });
+                    }
+                });
+
+                populateFilters();
+                applyFilters();
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // --- FUNCIONES AUXILIARES (Sin cambios) ---
+        function populateFilters() {
+            const gestiones = new Set();
+            const estados = new Set();
+            const years = new Set();
+
+            masterData.forEach(d => {
+                if(d['GESTION']) gestiones.add(d['GESTION'].toString().trim().toUpperCase());
+                if(d['ESTADO EXPEDIENTE']) estados.add(d['ESTADO EXPEDIENTE'].toString().trim().toUpperCase());
+                if(d['_OrigenAÑO']) years.add(d['_OrigenAÑO']);
+            });
+
+            fillSelect(fGestion, Array.from(gestiones).sort());
+            fillSelect(fEstado, Array.from(estados).sort());
+            fillSelect(fYear, Array.from(years).sort());
+        }
+
+        function fillSelect(selectElement, optionsArray) {
+            selectElement.innerHTML = '<option value="ALL">Todos</option>';
+            optionsArray.forEach(opt => {
+                if(opt && opt !== "") {
+                    const option = document.createElement('option');
+                    option.value = opt;
+                    option.textContent = opt;
+                    selectElement.appendChild(option);
+                }
+            });
+        }
+
+        function populateExpedienteSelector(data) {
+            selExpediente.innerHTML = '<option value="">Seleccione un expediente...</option>';
+            data.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d['EXPEDIENTE N°'];
+                opt.textContent = `${d['EXPEDIENTE N°']} - ${d['NOMBRE DEL PACIENTE'] || 'S/N'}`;
+                selExpediente.appendChild(opt);
+            });
+            document.getElementById('detPaciente').textContent = '-';
+            document.getElementById('detGestion').textContent = '-';
+            document.getElementById('detFecha').textContent = '-';
+            document.getElementById('detExtracto').textContent = '-';
+            document.getElementById('detMovimientos').textContent = '-';
+        }
+
+        function applyFilters() {
+            const valGestion = fGestion.value;
+            const valEstado = fEstado.value;
+            const valYear = fYear.value;
+
+            filteredData = masterData.filter(d => {
+                const matchG = valGestion === 'ALL' || (d['GESTION'] && d['GESTION'].toString().trim().toUpperCase() === valGestion);
+                const matchE = valEstado === 'ALL' || (d['ESTADO EXPEDIENTE'] && d['ESTADO EXPEDIENTE'].toString().trim().toUpperCase() === valEstado);
+                const matchY = valYear === 'ALL' || d['_OrigenAÑO'] === valYear;
+                return matchG && matchE && matchY;
+            });
+
+            updateCards();
+            updateCharts();
+            populateExpedienteSelector(filteredData);
+        }
+
+        function updateCards() {
+            document.getElementById('kpiTotal').textContent = filteredData.length;
+            const fin = filteredData.filter(d => d['ESTADO EXPEDIENTE'] && d['ESTADO EXPEDIENTE'].toString().toUpperCase().includes('FINALIZADO')).length;
+            const tram = filteredData.filter(d => d['ESTADO EXPEDIENTE'] && d['ESTADO EXPEDIENTE'].toString().toUpperCase().includes('EN TRAMITE')).length;
+            document.getElementById('kpiFinalizados').textContent = fin;
+            document.getElementById('kpiTramite').textContent = tram;
+        }
+
+        function showExpedienteDetail() {
+            const id = selExpediente.value;
+            if(!id) return;
+            const record = filteredData.find(d => d['EXPEDIENTE N°'] == id);
+            if(record) {
+                document.getElementById('detPaciente').textContent = record['NOMBRE DEL PACIENTE'] || 'S/D';
+                document.getElementById('detGestion').textContent = record['GESTION'] || 'S/D';
+                document.getElementById('detFecha').textContent = record['FECHA INICIO'] || 'S/D';
+                document.getElementById('detExtracto').textContent = record['EXTRACTO EXPTE'] || 'S/D';
+                document.getElementById('detMovimientos').textContent = record['MOVIMIENTOS DEL EXPEDIENTE'] || 'S/D';
+            }
+        }
+
+        function countFrequencies(dataArray, key) {
+            return dataArray.reduce((acc, obj) => {
+                let val = obj[key] ? obj[key].toString().trim().toUpperCase() : 'SIN DATOS';
+                acc[val] = (acc[val] || 0) + 1;
+                return acc;
+            }, {});
+        }
+
+        function createChart(instance, ctxId, type, labels, data, colors) {
+            if (instance) instance.destroy();
+            const ctx = document.getElementById(ctxId).getContext('2d');
+            return new Chart(ctx, {
+                type: type,
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: type !== 'bar' } }
+                }
+            });
+        }
+
+        function updateCharts() {
+            // 1. Gráfico Estado
+            const estadoFreq = countFrequencies(filteredData, 'ESTADO EXPEDIENTE');
+            chartEstadoInstance = createChart(chartEstadoInstance, 'chartEstado', 'bar', 
+                Object.keys(estadoFreq), Object.values(estadoFreq), 
+                ['rgba(34, 197, 94, 0.7)', 'rgba(245, 158, 11, 0.7)', 'rgba(156, 163, 175, 0.7)']
+            );
+
+            // 2. Gráfico Dona Expediente N°
+            const expFreq = countFrequencies(filteredData, 'EXPEDIENTE N°');
+            const expLabels = Object.keys(expFreq).slice(0, 50);
+            const expData = Object.values(expFreq).slice(0, 50);
+            const randomColors = expLabels.map(() => `hsl(${Math.floor(Math.random() * 360)}, 70%, 60%)`);
+            chartExpedientesInstance = createChart(chartExpedientesInstance, 'chartExpedientes', 'doughnut', expLabels, expData, randomColors);
+
+            // 3. Gráfico Dona Gestión
+            const gestionFreq = countFrequencies(filteredData, 'GESTION');
+            chartGestionInstance = createChart(chartGestionInstance, 'chartGestion', 'pie', 
+                Object.keys(gestionFreq), Object.values(gestionFreq), 
+                ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#64748b']
+            );
+
+            // 4. Gráfico Barras Top Extractos
+            const extFreq = countFrequencies(filteredData, 'EXTRACTO EXPTE');
+            const sortedExt = Object.entries(extFreq).sort((a,b) => b[1] - a[1]).slice(0, 10);
+            chartExtractosInstance = createChart(chartExtractosInstance, 'chartExtractos', 'bar', 
+                sortedExt.map(e => e[0].substring(0, 20) + '...'),
+                sortedExt.map(e => e[1]), 
+                'rgba(59, 130, 246, 0.7)'
+            );
+        }
+    </script>
+</body>
+</html>
